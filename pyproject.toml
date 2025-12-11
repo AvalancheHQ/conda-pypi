@@ -118,6 +118,9 @@ zstandard = "*"  # Will be in stdlib as compression.zstd in Python 3.14+
 # Build backend for flit tests
 flit = "*"
 
+[tool.pixi.feature.test.pypi-dependencies]
+pytest-codspeed = "==4.2.0"
+
 [tool.pixi.feature.py310.dependencies]
 python = "3.10.*"
 

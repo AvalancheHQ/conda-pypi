@@ -1,0 +1,60 @@
+name: CodSpeed Benchmarks
+'on':
+  push:
+    branches:
+    - main
+  pull_request:
+    paths:
+    - .github/workflows/codspeed.yml
+    - conda_pypi/**
+    - tests/**
+    - pyproject.toml
+    - pixi.toml
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha
+    }}
+  cancel-in-progress: true
+jobs:
+  benchmarks:
+    name: Run benchmarks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PIXI_ENV_NAME: test-py312
+    steps:
+    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      with:
+        fetch-depth: 0
+    - uses: prefix-dev/setup-pixi@28eb668aafebd9dede9d97c4ba1cd9989a4d0004
+      with:
+        environments: ${{ env.PIXI_ENV_NAME }}
+    - name: Fix Ubuntu configuration
+      run: '# Remove global pip config that interferes with isolated testing
+
+        # See: https://github.com/actions/runner-images/blob/6d025759810a/images/ubuntu/scripts/build/install-python.sh#L15-L21
+
+        sudo rm /etc/pip.conf
+
+        '
+    - name: Setup project
+      run: 'pixi reinstall --environment ${{ env.PIXI_ENV_NAME }} conda-pypi
+
+        pixi run --environment ${{ env.PIXI_ENV_NAME }} dev
+
+        echo "channels: [conda-forge]" > .pixi/envs/${{ env.PIXI_ENV_NAME }}/.condarc
+
+        pixi run --environment ${{ env.PIXI_ENV_NAME }} conda info
+
+        '
+    - name: Run benchmarks
+      run: 'pixi run --environment ${{ env.PIXI_ENV_NAME }} pytest tests/test_benchmarks.py
+        --codspeed --basetemp=${{ runner.temp }} -vv
+
+        '
+    - name: Upload CodSpeed results
+      uses: CodSpeedHQ/action@v4.4.1
+      with:
+        upload-url: ${{ secrets.CODSPEED_STAGING_UPLOAD_URL }}
+        mode: simulation
